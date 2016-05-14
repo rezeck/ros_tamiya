@@ -49,6 +49,7 @@ find_package(catkin REQUIRED COMPONENTS
  add_message_files(
    FILES
    Imu.msg
+   Motor.msg
    Gps_msg.msg
  )
 

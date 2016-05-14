@@ -1,4 +1,7 @@
-geometry_msgs/Point32 gyro
-geometry_msgs/Point32 accel
-geometry_msgs/Point32 mag
-std_msgs/Float32 heading
+geometry_msgs/Point32 gyroscope
+geometry_msgs/Point32 accelerometer
+geometry_msgs/Point32 magnetometer
+float32 heading
+float32 temperature
+float32 altitude
+float32 pressure
