@@ -53,17 +53,22 @@ class RobotCar:
         pass
 
     def setGPS(self, data):
-        print 'setGPS data:', data.latitude, data.longitude 
+        #print 'setGPS data:', data.latitude, data.longitude 
         self.latitude = data.latitude
         self.longitude = data.longitude
         self.orientation = data.orientation
         self.speed = (0.514444*data.speed) # from knots to meters/sec
 
     def setIMU(self, data):
-        print 'setIMU data:', data 
+        #print 'setIMU data:', data.heading
         self.phi = data.gyroscope
         self.theta = data.accelerometer
-        self.psi = heading
+        
+        self.psi = (atan2(data.magnetometer.y, data.magnetometer.x) * 180) / pi
+        if self.psi < 0:
+            self.psi += 360
+        
+        #self.psi = data.heading
         
         #self.psi = self.psi + self.MAGNETIC_DEFLECTION
         #self.psi = self.psi % (2.0 * math.pi)
@@ -130,9 +135,15 @@ class RobotCar:
         return (c * r) * 1000
 
     def control(self):
-        bearing = self.calcBearingToTarget()
-        print "Bearing:", degrees(bearing)
+        print "Compass:", self.psi
+
+        bearing = degrees(self.calcBearingToTarget())
+        if bearing < 0:
+            bearing += 360
+        print "Bearing:", bearing
+
         psiref = self.psi - bearing
+        print "Dif:", psiref
         
         self.out_ang = degrees(self.angularControl(psiref)) #[-90..90]
         self.out_lin = self.speedControl()
