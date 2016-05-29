@@ -25,6 +25,7 @@
 #define STERRING_WHEELS_PIN 8
 #define DRIVE_WHEELS_PIN 9
 #define LED_PIN 13
+#define GREEN_LED_PIN 3
 /********************************************************************/
 
 /********************************************************************/
@@ -38,6 +39,7 @@ LSM303 compass;
 L3G gyro;
 
 double baseline;
+byte loopCounter = 0;
 /********************************************************************/
 
 /********************************************************************/
@@ -47,7 +49,9 @@ void callback(const geometry_msgs::Twist& msg){
     setDriverTo(msg.linear.x);
     sterring_wheels.write(msg.angular.z);
     
-    digitalWrite(LED_PIN, HIGH-digitalRead(LED_PIN));// blink the led
+    digitalWrite(GREEN_LED_PIN, HIGH);
+    delay(20);
+    digitalWrite(GREEN_LED_PIN, LOW);
 }
 /********************************************************************/
 
@@ -69,7 +73,9 @@ ros::Publisher pub_motor("motor_position", &motor_msg);
 /********************************************************************/
 void setup() {
   pinMode(LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
+  digitalWrite(GREEN_LED_PIN, HIGH);
 
   /******************************************************/  
   /* Setup motor drive and sterring
@@ -78,7 +84,7 @@ void setup() {
   drive_wheels.attach(DRIVE_WHEELS_PIN);
   drive_wheels.writeMicroseconds(1600); // Neutral
   sterring_wheels.write(95); // Neutral
-  delay(1500);
+  
   /******************************************************/
   
   /******************************************************/
@@ -104,13 +110,17 @@ void setup() {
   /******************************************************/
   /* Setup ROS
   /******************************************************/
+  nh.getHardware()->setBaud(115200);
   nh.initNode();
   nh.subscribe(sub);
   nh.advertise(pub_motor);
   nh.advertise(pub_imu);
   /******************************************************/
   
+  delay(1500);
   digitalWrite(LED_PIN, LOW);
+  digitalWrite(GREEN_LED_PIN, LOW);
+  
 }
 /********************************************************************/
 
@@ -118,21 +128,27 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
-  getMagnetometerMsg();
-  getAccelerometerMsg();
-  
-  getTemperatureMsg();  
-  getPressureMsg();
-  getAltitudeMsg();
-  getGyroscopeMsg();
-  
-  motor_msg.motor_position = drive_wheels.read();
-  motor_msg.sterring_position = sterring_wheels.read();
-  
-  pub_motor.publish(&motor_msg);
-  pub_imu.publish(&imu_msg);
   nh.spinOnce();
-  delay(50);
+  
+  //if(loopCounter > 10){
+    loopCounter = 0;
+    getMagnetometerMsg();
+    getAccelerometerMsg();
+    
+    getTemperatureMsg();  
+    getPressureMsg();
+    getAltitudeMsg();
+    getGyroscopeMsg();
+    
+    motor_msg.motor_position = drive_wheels.read();
+    motor_msg.sterring_position = sterring_wheels.read();
+    
+    
+    pub_motor.publish(&motor_msg);
+    pub_imu.publish(&imu_msg);
+  //}
+  loopCounter++;
+  delay(1);
 }
 /********************************************************************/
 

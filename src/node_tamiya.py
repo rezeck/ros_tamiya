@@ -7,6 +7,7 @@ import pid_class
 from ros_tamiya.msg import Gps_msg
 from ros_tamiya.msg import Imu
 from geometry_msgs.msg import Twist
+import time
 
 robot = None
 
@@ -30,8 +31,8 @@ class RobotCar:
         self.MAGNETIC_DEFLECTION = 123
 
         # Lat, lon
-        self.gps_target = [-19.868451, -43.966535]
-        self.gps_pos = [-19.868828, -43.967068]
+        self.gps_target = [-19.868510, -43.966568]
+        self.gps_pos = [-19.869648, -43.965418]
                         #-19.869544, -43.966333
                         #-19.868101, -43.966955
                         #-19.868828, -43.967068
@@ -49,7 +50,9 @@ class RobotCar:
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_STEERING, self.MAX_STEERING)
         self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, 0.0, self.VMAX_PERCENT)
         
-        self.vel_publisher = rospy.Publisher('vel_cmd', Twist, queue_size=1)
+        self.vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=1, latch=True)
+        rospy.Subscriber("gps", Gps_msg, self.setGPS)
+        rospy.Subscriber("imu", Imu, self.setIMU)
         pass
 
     def setGPS(self, data):
@@ -64,11 +67,11 @@ class RobotCar:
         self.phi = data.gyroscope
         self.theta = data.accelerometer
         
-        self.psi = (atan2(data.magnetometer.y, data.magnetometer.x) * 180) / pi
-        if self.psi < 0:
-            self.psi += 360
+        # self.psi = (atan2(data.magnetometer.y, data.magnetometer.x) * 180) / pi
+        # if self.psi < 0:
+        #     self.psi += 360
         
-        #self.psi = data.heading
+        self.psi = data.heading
         
         #self.psi = self.psi + self.MAGNETIC_DEFLECTION
         #self.psi = self.psi % (2.0 * math.pi)
@@ -82,7 +85,9 @@ class RobotCar:
         pass
 
     def angularControl(self, psi_ref):
-        alpha = psi_ref - self.psi
+        self.pid_angle.reference(0.0)
+
+        alpha = psi_ref - radians(self.psi)
 
         # garante erro entre [-pi...pi]
         while alpha <  pi:
@@ -116,7 +121,12 @@ class RobotCar:
         dLon = lon2 - lon1
         y = sin(dLon) * cos(lat2)
         x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
-        return atan2(y, x)
+
+        a1 = atan2(y, x)
+        if a1 < 0.0:
+            a1 += 2 * pi
+        
+        return a1
 
     def haversineDistanceToTarget(self):
         """
@@ -145,19 +155,22 @@ class RobotCar:
         psiref = self.psi - bearing
         print "Dif:", psiref
         
-        self.out_ang = degrees(self.angularControl(psiref)) #[-90..90]
+        self.out_ang = degrees(self.angularControl(radians(psiref))) #[-90..90]
         self.out_lin = self.speedControl()
         pass
 
     def publish(self):
         print "Publishing!"
+        print self.vel_publisher
         print "Angular:", self.out_ang
         print "Linear:", self.out_lin
-        print "\n\n"
 
         vel_msg = Twist()
         vel_msg.angular.z = self.out_ang
         vel_msg.linear.x = self.out_lin
+
+        print vel_msg
+        
         self.vel_publisher.publish(vel_msg)
 
         pass
@@ -166,12 +179,11 @@ def init_current_node():
     rospy.init_node('robotcar', anonymous=True)
 
     robot = RobotCar()
-    rospy.Subscriber("gps", Gps_msg, robot.setGPS)
-    rospy.Subscriber("imu", Imu, robot.setIMU)
 
     while not rospy.is_shutdown():
         robot.control()
         robot.publish()
+        print "\n\n"
         rospy.sleep(1.0)
 
 if __name__ == '__main__':
