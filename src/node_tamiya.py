@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 
-from math import radians, cos, sin, asin, sqrt, atan2, degrees, pi
+from math import radians, cos, sin, asin, sqrt, atan2, degrees, pi, log, tan
 import pid_class
 
 from ros_tamiya.msg import Gps_msg
@@ -116,17 +116,19 @@ class RobotCar:
         on the earth (specified in decimal degrees)
         """
         # convert decimal degrees to radians 
-        lon1, lat1, lon2, lat2 = map(radians, [self.gps_pos[1], self.gps_pos[0], self.gps_target[1], self.gps_target[1]])
+        lat1, lon1, lat2, lon2 = map(radians, 
+            [self.gps_pos[1], self.gps_pos[0], self.gps_target[1], self.gps_target[1]])
 
         dLon = lon2 - lon1
-        y = sin(dLon) * cos(lat2)
-        x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        dPhi = log((tan(lat2/2.0 + pi/4.0) / tan(lat1/2.0 + pi/4.0)))
+        if abs(dLon) > pi:
+            if (dLon) > 0.0:
+                dLon = -(2.0 * pi - dLon)
+            else:
+                dLon = (2.0 * pi + dLon)
 
-        a1 = atan2(y, x)
-        if a1 < 0.0:
-            a1 += 2 * pi
-        
-        return a1
+        bearing = (degrees(atan2(dLon, dPhi)) + 360.0) % 360.0
+        return bearing
 
     def haversineDistanceToTarget(self):
         """
