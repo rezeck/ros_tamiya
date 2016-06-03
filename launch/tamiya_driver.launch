@@ -1,5 +1,5 @@
 <launch>
-  <arg name="port" default="/dev/ttyACM1" />
+  <arg name="port" default="/dev/ttyACM0" />
   <arg name="baud" default="115200" />
   <node pkg="rosserial_server" type="serial_node" name="tamiya_driver" output="screen">
     <param name="port" value="$(arg port)" />

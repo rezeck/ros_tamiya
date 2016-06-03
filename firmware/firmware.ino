@@ -39,7 +39,7 @@ LSM303 compass;
 L3G gyro;
 
 double baseline;
-byte loopCounter = 0;
+int neutral = 102;
 /********************************************************************/
 
 /********************************************************************/
@@ -82,7 +82,7 @@ void setup() {
   /******************************************************/
   sterring_wheels.attach(STERRING_WHEELS_PIN);
   drive_wheels.attach(DRIVE_WHEELS_PIN);
-  drive_wheels.writeMicroseconds(1600); // Neutral
+  drive_wheels.write(neutral); // Neutral
   sterring_wheels.write(95); // Neutral
   
   /******************************************************/
@@ -117,7 +117,7 @@ void setup() {
   nh.advertise(pub_imu);
   /******************************************************/
   
-  delay(1500);
+  delay(1000);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(GREEN_LED_PIN, LOW);
   
@@ -128,27 +128,24 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
-  nh.spinOnce();
-  
-  //if(loopCounter > 10){
-    loopCounter = 0;
+    nh.spinOnce();
+
     getMagnetometerMsg();
     getAccelerometerMsg();
+    nh.spinOnce();
     
     getTemperatureMsg();  
     getPressureMsg();
     getAltitudeMsg();
     getGyroscopeMsg();
+    nh.spinOnce();
     
     motor_msg.motor_position = drive_wheels.read();
     motor_msg.sterring_position = sterring_wheels.read();
     
-    
     pub_motor.publish(&motor_msg);
     pub_imu.publish(&imu_msg);
-  //}
-  loopCounter++;
-  delay(1);
+    delay(10);
 }
 /********************************************************************/
 
@@ -220,30 +217,24 @@ void getAltitudeMsg(){
 /********************************************************************/
 /* Read ros commands and control drive and sterring                 */
 /********************************************************************/
-// Must to be improved!!!
 void setDriverTo(int velocity){ // 1000:2000 (forward:backward)
-  int neutral = 1600;
+  if (velocity == drive_wheels.read()) return;
   
-  if (velocity < 1000) velocity = 1000;
-  else if (velocity > 2000) velocity = 2000;
-  
-  drive_wheels.writeMicroseconds(velocity); // Neutral
-  delay(1500);
-  drive_wheels.writeMicroseconds(neutral); // Neutral
-  delay(1500);
-  drive_wheels.writeMicroseconds(velocity); // Neutral
-  /*
-	if (v > 180 || v < 0) return;
+  if (velocity < 0) velocity = neutral;
+  else if (velocity > 180) velocity = neutral;
 
-        int pos = drive_wheels.read();
+  bool dir = drive_wheels.read() <= neutral;
+  bool newdir = velocity <= neutral;
 
-	int i = (v-pos)/abs(v-pos);
+  if (dir != newdir){
+    drive_wheels.write(velocity); // set velocity
+    delay(150);
+    drive_wheels.write(neutral); // set to Neutral
+    //nh.spinOnce();
+    delay(150);
+  }
+  drive_wheels.write(velocity); // set velocity
 
-	while (drive_wheels.read() != v){
-	    drive_wheels.write(drive_wheels.read() + i);
-    	    delayMicroseconds(50);
-	}
-*/
 }
 /********************************************************************/
 
