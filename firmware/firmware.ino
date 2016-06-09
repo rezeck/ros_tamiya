@@ -41,6 +41,10 @@ L3G gyro;
 
 double baseline;
 int neutral = 102;
+const float alpha = 0.6;
+float fxm = 0;
+float fym = 0;
+float fzm = 0;
 /********************************************************************/
 
 /********************************************************************/
@@ -157,10 +161,33 @@ void loop() {
 /********************************************************************/
 void getMagnetometerMsg(){
   compass.read();
-  imu_msg.heading = compass.heading();
-  imu_msg.magnetometer.x = compass.m.x;
-  imu_msg.magnetometer.y = compass.m.y;
-  imu_msg.magnetometer.z = compass.m.z;
+  float compass_heading, xm_off, ym_off, zm_off, xm_cal, ym_cal, zm_cal, fxm_comp, fym_comp;
+  
+  // Magnetometer calibration
+  // Tutorial used: http://forum.arduino.cc/index.php?topic=265541.0
+  xm_off = compass.m.x * (100000.0/1100.0) -  (137.195048);
+  ym_off = compass.m.y * (100000.0/1100.0) -  (-776.479788);
+  zm_off = compass.m.z * (100000.0/980.0)  -  (809.501242);
+  xm_cal = (0.994089      * xm_off) + (0.013603 * ym_off) + ((-0.005624)  * zm_off);
+  ym_cal = (0.013603      * xm_off) + (0.970578 * ym_off) + (0.018167     * zm_off);
+  zm_cal = ((-0.005624)   * xm_off) + (0.018167 * ym_off) + (0.976481     * zm_off);
+  
+  // Low-Pass filter magnetometer
+  fxm = xm_cal * alpha + (fxm * (1.0 - alpha));
+  fym = ym_cal * alpha + (fym * (1.0 - alpha));
+  fzm = zm_cal * alpha + (fzm * (1.0 - alpha));
+  
+  // Arctangent of y/x
+  compass_heading = (atan2(fym,fxm) * 180.0)/M_PI;
+  if (compass_heading < 0) compass_heading += 360;
+  if(compass_heading < 0) compass_heading += 360;
+  
+  compass_heading = 360 - compass_heading;
+  
+  imu_msg.heading = compass_heading;
+  imu_msg.magnetometer.x = fxm;
+  imu_msg.magnetometer.y = fym;
+  imu_msg.magnetometer.z = fzm;
 }
 /********************************************************************/
 
