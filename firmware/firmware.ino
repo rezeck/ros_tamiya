@@ -31,6 +31,7 @@
 /********************************************************************/
 /*  Main objects and global variables                               */
 /********************************************************************/
+Servo ServoNothing;
 Servo sterring_wheels;
 Servo drive_wheels;
 
@@ -80,6 +81,8 @@ void setup() {
   /******************************************************/  
   /* Setup motor drive and sterring
   /******************************************************/
+  ServoNothing.attach(3);
+  
   sterring_wheels.attach(STERRING_WHEELS_PIN);
   drive_wheels.attach(DRIVE_WHEELS_PIN);
   drive_wheels.write(neutral); // Neutral
