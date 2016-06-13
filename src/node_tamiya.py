@@ -31,10 +31,12 @@ class RobotCar:
         self.gps_target = [-19.869689, -43.964652] 
                             # -19.869394, -43.964293 close to the entrance of icex
                             # -19.869689, -43.964652 near 
-        self.gps_pos = [-19.869951, -43.965057]
+        self.gps_pos = [0.0, 0.0]
 
-        self.orientation = 0
-        self.speed = 0
+        self.orientation = 0.0
+        self.speed = 0.0
+        self.sat_num = 0
+
         self.phi = 0
         self.theta = 0
         self.psi = 0
@@ -54,12 +56,23 @@ class RobotCar:
         rospy.Subscriber("imu", Imu, self.setIMU)
         pass
 
+    def isGPSFixed(self):
+        is_fixed = False
+
+        if sum(self.gps_pos) > 0.0 and self.sat_num > 3:
+            is_fixed = True
+
+        return is_fixed
+
+    def getGpsData(self):
+        return {'lat': self.gps_pos[0], 'lon': self.gps_pos[1], 'speed': self.speed, 'sat_num': self.sat_num, 'orientation': self.orientation}
+
     def setGPS(self, data):
         #print 'setGPS data:', data.latitude, data.longitude 
-        self.latitude = data.latitude
-        self.longitude = data.longitude
+        self.gps_pos = [data.latitude, data.longitude]
         self.orientation = data.orientation
         self.speed = (0.514444 * data.speed) # from knots to meters/sec
+        self.sat_num = data.sat_num
 
     def setIMU(self, data):
         #print 'setIMU data:', data.heading
@@ -67,19 +80,8 @@ class RobotCar:
         self.theta = data.accelerometer
         self.psi = data.heading
         
-        # self.psi = (atan2(data.magnetometer.y, data.magnetometer.x) * 180) / pi
-        # if self.psi < 0:
-        #     self.psi += 360
         #self.psi = self.psi + self.MAGNETIC_DEFLECTION
         #self.psi = self.psi % (2.0 * math.pi)
-
-    def set_linear_vel(self, vel):
-        self.lin_vel = vel
-        pass
-
-    def set_angular_vel(self, vel):
-        self.ang_vel = vel
-        pass
 
     def angularControl(self, psi_ref):
         self.pid_angle.reference(0.0)
@@ -145,6 +147,7 @@ class RobotCar:
 
     def control(self):
         print "Compass:", self.psi
+        print "Pos:", self.gps_pos
 
         bearing = self.calcBearingToTarget()
         print "Bearing to target:", bearing
@@ -173,8 +176,14 @@ def init_current_node():
     robot = RobotCar()
 
     while not rospy.is_shutdown():
-        robot.control()
-        robot.publish()
+        if robot.isGPSFixed():
+            robot.control()
+            robot.publish()
+            
+        else:
+            print 'Gps not fixed yet...'
+            print robot.getGpsData()
+
         print "\n\n"
         rospy.sleep(0.1)
 
