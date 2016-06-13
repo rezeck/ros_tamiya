@@ -12,6 +12,7 @@
 #include <SFE_BMP180.h>
 
 #include <Servo.h>
+#include <avr/wdt.h>
 
 #include <ros.h>
 #include <geometry_msgs/Twist.h>
@@ -26,6 +27,7 @@
 #define DRIVE_WHEELS_PIN 9
 #define LED_PIN 13
 #define GREEN_LED_PIN 3
+#define YELLOW_LED_PIN 13
 /********************************************************************/
 
 /********************************************************************/
@@ -40,7 +42,7 @@ LSM303 compass;
 L3G gyro;
 
 double baseline;
-int neutral = 102;
+int neutral = 1600;
 const float alpha = 0.6;
 float fxm = 0;
 float fym = 0;
@@ -52,7 +54,7 @@ float fzm = 0;
 /********************************************************************/
 void callback(const geometry_msgs::Twist& msg){
     setDriverTo(msg.linear.x);
-    sterring_wheels.write(msg.angular.z);
+    setSterringTo(msg.angular.z);
     
     digitalWrite(GREEN_LED_PIN, HIGH);
     delay(20);
@@ -63,22 +65,29 @@ void callback(const geometry_msgs::Twist& msg){
 /********************************************************************/
 /*  ROS Setup                                                       */
 /********************************************************************/
-ros::NodeHandle nh;
+ros::NodeHandle_<ArduinoHardware, 6, 6, 150, 150> nh; 
 ros::Subscriber<geometry_msgs::Twist> sub("cmd_vel", callback);
 
 ros_tamiya::Imu imu_msg;
 ros::Publisher pub_imu("imu", &imu_msg);
 
-ros_tamiya::Motor motor_msg;
-ros::Publisher pub_motor("motor_position", &motor_msg);
+//ros_tamiya::Motor motor_msg;
+//ros::Publisher pub_motor("motor_position", &motor_msg);
 /********************************************************************/
 
 /********************************************************************/
 /*  Arduino Setup function                                          */
 /********************************************************************/
 void setup() {
+  wdt_enable(WDTO_2S);
+  wdt_reset();
+  
+  Serial.begin(9600);
+  
   pinMode(LED_PIN, OUTPUT);
   pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(YELLOW_LED_PIN, OUTPUT);
+  
   digitalWrite(LED_PIN, HIGH);
   digitalWrite(GREEN_LED_PIN, HIGH);
 
@@ -117,14 +126,14 @@ void setup() {
   /******************************************************/
   /* Setup ROS
   /******************************************************/
-  nh.getHardware()->setBaud(115200);
+  nh.getHardware()->setBaud(9600);
   nh.initNode();
   nh.subscribe(sub);
-  nh.advertise(pub_motor);
+  //nh.advertise(pub_motor);
   nh.advertise(pub_imu);
   /******************************************************/
   
-  delay(1000);
+  delay(500);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(GREEN_LED_PIN, LOW);
   
@@ -135,24 +144,27 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
+    wdt_reset();
     nh.spinOnce();
 
     getMagnetometerMsg();
     getAccelerometerMsg();
-    nh.spinOnce();
     
     getTemperatureMsg();  
     getPressureMsg();
     getAltitudeMsg();
     getGyroscopeMsg();
-    nh.spinOnce();
     
-    motor_msg.motor_position = drive_wheels.read();
-    motor_msg.sterring_position = sterring_wheels.read();
+    //Serial.println(imu_msg.heading);
     
-    pub_motor.publish(&motor_msg);
+    //motor_msg.motor_position = drive_wheels.read();
+    //motor_msg.sterring_position = sterring_wheels.read();
+    
+    //pub_motor.publish(&motor_msg);
     pub_imu.publish(&imu_msg);
-    delay(10);
+    digitalWrite(YELLOW_LED_PIN, HIGH);
+    delay(50);
+    digitalWrite(YELLOW_LED_PIN, LOW);
 }
 /********************************************************************/
 
@@ -245,26 +257,30 @@ void getAltitudeMsg(){
 /********************************************************************/
 
 /********************************************************************/
-/* Read ros commands and control drive and sterring                 */
+/* Read ros commands and control drive                              */
 /********************************************************************/
 void setDriverTo(int velocity){ // 1000:2000 (forward:backward)
-  if (velocity == drive_wheels.read()) return;
+  if(velocity > 300) velocity = 300;
+  else if (velocity < -300) velocity = -300;
+
+  int calcVel = abs(velocity + 300) + 1000;
+  if (calcVel == drive_wheels.read()) return;
   
-  if (velocity < 0) velocity = neutral;
-  else if (velocity > 180) velocity = neutral;
-
-  bool dir = drive_wheels.read() <= neutral;
-  bool newdir = velocity <= neutral;
-
-  if (dir != newdir){
-    drive_wheels.write(velocity); // set velocity
-    delay(150);
-    drive_wheels.write(neutral); // set to Neutral
-    //nh.spinOnce();
-    delay(150);
-  }
   drive_wheels.write(velocity); // set velocity
+}
+/********************************************************************/
 
+/********************************************************************/
+/* Read ros commands and control sterring                           */
+/********************************************************************/
+void setSterringTo(int angle){ // 0:190 (left:right)
+  if(angle > 95) angle = 95;
+  else if (angle < -95) angle = -95;
+
+  int calcAng = angle + 95;
+  if (calcAng == sterring_wheels.read()) return;
+  
+  sterring_wheels.write(calcAng); // set angle
 }
 /********************************************************************/
 

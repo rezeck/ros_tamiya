@@ -13,29 +13,25 @@ robot = None
 
 class RobotCar:
     def __init__(self):
-        self.VMAX_PERCENT = 20 # max velocity percentage
         self.WAYPOINT_RADIUS = 2.0 # [m]
         
         # Gains linear vel
-        self.KP_VEL = -5.0 
+        self.KP_VEL = 5.0 
         self.TI_VEL = 80.0
         self.TD_VEL = 0*0.00005
 
         # Gains angular vel
-        self.KP_PSI = -0.7
+        self.KP_PSI = 0.7
         self.TI_PSI = 70.0
         self.TD_PSI = 0*0.00007
-
-        self.MAX_STEERING = 90.0 # max sterring angle
 
         self.MAGNETIC_DEFLECTION = 123
 
         # Lat, lon
-        self.gps_target = [-19.868510, -43.966568]
-        self.gps_pos = [-19.869648, -43.965418]
-                        #-19.869544, -43.966333
-                        #-19.868101, -43.966955
-                        #-19.868828, -43.967068
+        self.gps_target = [-19.869689, -43.964652] 
+                            # -19.869394, -43.964293 close to the entrance of icex
+                            # -19.869689, -43.964652 near 
+        self.gps_pos = [-19.869951, -43.965057]
 
         self.orientation = 0
         self.speed = 0
@@ -47,8 +43,11 @@ class RobotCar:
         self.out_ang = 0
         self.out_lin = 0
 
-        self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_STEERING, self.MAX_STEERING)
-        self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, 0.0, self.VMAX_PERCENT)
+        self.MAX_ANGLE = 95
+        self.MAX_LINEAR = 300
+
+        self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
+        self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -self.MAX_LINEAR, self.MAX_LINEAR)
         
         self.vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=1, latch=True)
         rospy.Subscriber("gps", Gps_msg, self.setGPS)
@@ -60,19 +59,17 @@ class RobotCar:
         self.latitude = data.latitude
         self.longitude = data.longitude
         self.orientation = data.orientation
-        self.speed = (0.514444*data.speed) # from knots to meters/sec
+        self.speed = (0.514444 * data.speed) # from knots to meters/sec
 
     def setIMU(self, data):
         #print 'setIMU data:', data.heading
         self.phi = data.gyroscope
         self.theta = data.accelerometer
+        self.psi = data.heading
         
         # self.psi = (atan2(data.magnetometer.y, data.magnetometer.x) * 180) / pi
         # if self.psi < 0:
         #     self.psi += 360
-        
-        self.psi = data.heading
-        
         #self.psi = self.psi + self.MAGNETIC_DEFLECTION
         #self.psi = self.psi % (2.0 * math.pi)
 
@@ -87,7 +84,7 @@ class RobotCar:
     def angularControl(self, psi_ref):
         self.pid_angle.reference(0.0)
 
-        alpha = psi_ref - radians(self.psi)
+        alpha = radians(self.psi) - radians(psi_ref)
 
         # garante erro entre [-pi...pi]
         while alpha <  pi:
@@ -105,8 +102,8 @@ class RobotCar:
         print "GPS distance(m):", rho 
         
         if rho <= self.WAYPOINT_RADIUS:
-            while(True):
-                print "REACHED!!!, get new WP"
+            print "REACHED!!!, get new WP"
+            return 1600
         
         return self.pid_vel.u(rho)
 
@@ -117,7 +114,7 @@ class RobotCar:
         """
         # convert decimal degrees to radians 
         lat1, lon1, lat2, lon2 = map(radians, 
-            [self.gps_pos[1], self.gps_pos[0], self.gps_target[1], self.gps_target[1]])
+            [self.gps_pos[0], self.gps_pos[1], self.gps_target[0], self.gps_target[1]])
 
         dLon = lon2 - lon1
         dPhi = log((tan(lat2/2.0 + pi/4.0) / tan(lat1/2.0 + pi/4.0)))
@@ -136,7 +133,7 @@ class RobotCar:
         on the earth (specified in decimal degrees)
         """
         # convert decimal degrees to radians 
-        lon1, lat1, lon2, lat2 = map(radians, [self.gps_pos[1], self.gps_pos[0], self.gps_target[1], self.gps_target[1]])
+        lon1, lat1, lon2, lat2 = map(radians, [self.gps_pos[0], self.gps_pos[1], self.gps_target[0], self.gps_target[1]])
 
         # haversine formula 
         dlon = lon2 - lon1 
@@ -149,29 +146,22 @@ class RobotCar:
     def control(self):
         print "Compass:", self.psi
 
-        bearing = degrees(self.calcBearingToTarget())
-        if bearing < 0:
-            bearing += 360
-        print "Bearing:", bearing
-
-        psiref = self.psi - bearing
-        print "Dif:", psiref
+        bearing = self.calcBearingToTarget()
+        print "Bearing to target:", bearing
         
-        self.out_ang = degrees(self.angularControl(radians(psiref))) #[-90..90]
+        self.out_ang = degrees(self.angularControl(bearing))
         self.out_lin = self.speedControl()
         pass
 
     def publish(self):
         print "Publishing!"
-        print self.vel_publisher
-        print "Angular:", self.out_ang
-        print "Linear:", self.out_lin
+        print "Linear:", self.out_lin, 'realCommand:', abs(self.out_lin + 300) + 1000
+        print "Angular:", self.out_ang, 'realCommand:', self.out_ang + 95
+        
 
         vel_msg = Twist()
         vel_msg.angular.z = self.out_ang
         vel_msg.linear.x = self.out_lin
-
-        print vel_msg
         
         self.vel_publisher.publish(vel_msg)
 
@@ -186,7 +176,7 @@ def init_current_node():
         robot.control()
         robot.publish()
         print "\n\n"
-        rospy.sleep(1.0)
+        rospy.sleep(0.1)
 
 if __name__ == '__main__':
     init_current_node()

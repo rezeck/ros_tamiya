@@ -70,34 +70,57 @@ class PID:
 		# delta de atuacao Proporcional
 		delta_un = self.Kp*(ePn - self.ePn1)
 
-		# TESTING ONLY PROPORTIONAL, UNCOMMENT THE OTHERS FOR INTEGRATIVE AND DERIVATIVE
-		self.un = delta_un
-		return self.un
-	
-		# termo integral
-		# if (self.Ti != 0.0):
-		# 	delta_un = delta_un + self.Kp*(Ts/self.Ti)*en
-		
-		# # termo derivativo
-		# if (Ts != 0.0):
-		# 	delta_un = delta_un + self.Kp*(self.Td/Ts)*(eDfn - 2*self.eDfn1 + self.eDfn2)
-	
-		# # incrementa saida
-		# self.un = self.un + delta_un
-	
-		# # integrator anti-windup logic
+		# # TESTING ONLY PROPORTIONAL, UNCOMMENT THE OTHERS FOR INTEGRATIVE AND DERIVATIVE
+		# self.un = delta_un
 		# if self.un > self.umax:
 		# 	self.un = self.umax
 		# if self.un < self.umin:
 		# 	self.un = self.umin
-		
-		# # update indexed values
-		# self.ePn1 = ePn
-		# self.eDfn2 = self.eDfn1
-		# self.eDfn1 = eDfn
-		
-		# # novo tempo corrente
-		# self.t = self.t + Ts
-	
-		# # retorna a nova saida			
 		# return self.un
+	
+		# termo integral
+		if (self.Ti != 0.0):
+			delta_un = delta_un + self.Kp*(Ts/self.Ti)*en
+		
+		# termo derivativo
+		if (Ts != 0.0):
+			delta_un = delta_un + self.Kp*(self.Td/Ts)*(eDfn - 2*self.eDfn1 + self.eDfn2)
+	
+		# incrementa saida
+		self.un = self.un + delta_un
+	
+		# integrator anti-windup logic
+		if self.un > self.umax:
+			self.un = self.umax
+		if self.un < self.umin:
+			self.un = self.umin
+		
+		# update indexed values
+		self.ePn1 = ePn
+		self.eDfn2 = self.eDfn1
+		self.eDfn1 = eDfn
+		
+		# novo tempo corrente
+		self.t = self.t + Ts
+	
+		# retorna a nova saida			
+		return self.un
+
+if __name__ == "__main__":
+	
+	# Test linear
+	# KP_VEL = 5.0 
+	# TI_VEL = 80.0
+	# TD_VEL = 0*0.00005
+
+	# pid = PID(KP_VEL, TI_VEL, TD_VEL, -600, 600)
+	# pid.reference(0.0)
+	# print pid.u(0)
+
+	# Test angular
+	KP_PSI = 0.7
+	TI_PSI = 70.0
+	TD_PSI = 0*0.00007
+	pid = PID(KP_PSI, TI_PSI, TD_PSI, -95, 95)
+	pid.reference(0.0)
+	print pid.u(360)
