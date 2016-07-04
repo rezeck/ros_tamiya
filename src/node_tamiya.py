@@ -3,6 +3,7 @@ import rospy
 
 from math import radians, cos, sin, asin, sqrt, atan2, degrees, pi, log, tan
 import pid_class
+import wp_manager
 
 from ros_tamiya.msg import Gps_msg
 from ros_tamiya.msg import Imu
@@ -32,6 +33,7 @@ class RobotCar:
                             # -19.869394, -43.964293 close to the entrance of icex
                             # -19.869689, -43.964652 near 
         self.gps_pos = [0.0, 0.0]
+        self.wpm = wp_manager.WPManager()
 
         self.orientation = 0.0
         self.speed = 0.0
@@ -101,15 +103,15 @@ class RobotCar:
     def speedControl(self):
         self.pid_vel.reference(0.0)
         
-        rho = self.haversineDistanceToTarget()
-
-        print "GPS distance(m):", rho 
-        
-        if rho <= self.WAYPOINT_RADIUS:
-            print "REACHED!!!, get new WP"
+        if self.wpm.isWayPointReached(self.gps_pos[0], self.gps_pos[1]) and not wm.isCompleted():
+            print 'WP Reached, getting next one...'
+        elif wm.isCompleted():
+            print 'WP completed, stopping...'
             return 300
-        
-        return self.pid_vel.u(rho)
+        else:            
+            rho = self.wpm.getDistanceToTarget()
+            print "GPS distance(m):", rho 
+            return self.pid_vel.u(rho)
 
     def calcBearingToTarget(self):
         """
