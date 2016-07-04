@@ -89,6 +89,9 @@ class WPManager:
     def isCompleted(self):
         return self.is_completed
 
+    def getCurrentWayPoint(self):
+	return [self.currentWaypoint['lat'], self.currentWaypoint['lng']]
+
     def setNextWaypoint(self):
         if self.currentWaypointIndex >= self.waypointListSize:
             print 'Error - waypoint index > len(list)'

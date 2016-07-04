@@ -22,14 +22,14 @@ class RobotCar:
         self.TD_VEL = 0*0.00005
 
         # Gains angular vel
-        self.KP_PSI = 0.33
+        self.KP_PSI = 0.27
         self.TI_PSI = 80.0
         self.TD_PSI = 0*0.00007
 
         self.MAGNETIC_DEFLECTION = 22.2
 
         # Lat, lon
-        self.gps_target = [-19.8667107, -43.9643021] 
+        self.gps_target = [0, 0] 
                             # -19.869394, -43.964293 close to the entrance of icex
                             # -19.869689, -43.964652 near 
         self.gps_pos = [0.0, 0.0]
@@ -103,9 +103,10 @@ class RobotCar:
     def speedControl(self):
         self.pid_vel.reference(0.0)
         
-        if self.wpm.isWayPointReached(self.gps_pos[0], self.gps_pos[1]) and not wm.isCompleted():
+        if self.wpm.isWayPointReached(self.gps_pos[0], self.gps_pos[1]) and not self.wpm.isCompleted():
             print 'WP Reached, getting next one...'
-        elif wm.isCompleted():
+	    return 300
+        elif self.wpm.isCompleted():
             print 'WP completed, stopping...'
             return 300
         else:            
@@ -152,6 +153,8 @@ class RobotCar:
     def control(self):
         print "Compass:", self.psi
         print "Pos:", self.gps_pos
+
+	self.gps_target[0], self.gps_target[1] = self.wpm.getCurrentWayPoint()
 
         bearing = self.calcBearingToTarget()
         print "Bearing to target:", bearing
