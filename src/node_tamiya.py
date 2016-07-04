@@ -13,22 +13,22 @@ robot = None
 
 class RobotCar:
     def __init__(self):
-        self.WAYPOINT_RADIUS = 2.0 # [m]
+        self.WAYPOINT_RADIUS = 5.0 # [m]
         
         # Gains linear vel
-        self.KP_VEL = 5.0 
+        self.KP_VEL = 3.0 
         self.TI_VEL = 80.0
         self.TD_VEL = 0*0.00005
 
         # Gains angular vel
-        self.KP_PSI = 0.7
-        self.TI_PSI = 70.0
+        self.KP_PSI = 0.33
+        self.TI_PSI = 80.0
         self.TD_PSI = 0*0.00007
 
-        self.MAGNETIC_DEFLECTION = 123
+        self.MAGNETIC_DEFLECTION = 22.2
 
         # Lat, lon
-        self.gps_target = [-19.869689, -43.964652] 
+        self.gps_target = [-19.8667107, -43.9643021] 
                             # -19.869394, -43.964293 close to the entrance of icex
                             # -19.869689, -43.964652 near 
         self.gps_pos = [0.0, 0.0]
@@ -49,7 +49,7 @@ class RobotCar:
         self.MAX_LINEAR = 300
 
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
-        self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -self.MAX_LINEAR, self.MAX_LINEAR)
+        self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -(self.MAX_LINEAR), self.MAX_LINEAR)
         
         self.vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=1, latch=True)
         rospy.Subscriber("gps", Gps_msg, self.setGPS)
@@ -59,7 +59,7 @@ class RobotCar:
     def isGPSFixed(self):
         is_fixed = False
 
-        if sum(self.gps_pos) > 0.0 and self.sat_num > 3:
+        if self.gps_pos[0] != 0.0 and self.gps_pos[1] != 0.0 and self.sat_num > 3:
             is_fixed = True
 
         return is_fixed
@@ -80,8 +80,10 @@ class RobotCar:
         self.theta = data.accelerometer
         self.psi = data.heading
         
-        #self.psi = self.psi + self.MAGNETIC_DEFLECTION
-        #self.psi = self.psi % (2.0 * math.pi)
+        self.psi = self.psi - self.MAGNETIC_DEFLECTION
+        if self.psi < 360:
+		self.psi += 360
+	#self.psi = self.psi % (2.0 * math.pi)
 
     def angularControl(self, psi_ref):
         self.pid_angle.reference(0.0)
@@ -105,7 +107,7 @@ class RobotCar:
         
         if rho <= self.WAYPOINT_RADIUS:
             print "REACHED!!!, get new WP"
-            return 1600
+            return 300
         
         return self.pid_vel.u(rho)
 
