@@ -28,6 +28,8 @@
 #define LED_PIN 13
 #define GREEN_LED_PIN 3
 #define YELLOW_LED_PIN 13
+#define CHANNEL_1 10
+#define CHANNEL_2 11
 /********************************************************************/
 
 /********************************************************************/
@@ -47,18 +49,26 @@ const float alpha = 0.6;
 float fxm = 0;
 float fym = 0;
 float fzm = 0;
+
+int channel_1;
+int channel_2;
+int channel1_default;
+int channel2_default;
+int timer = 0;
 /********************************************************************/
 
 /********************************************************************/
 /*  ROS Callbacks                                                   */
 /********************************************************************/
 void callback(const geometry_msgs::Twist& msg){
-    setDriverTo(msg.linear.x);
-    setSterringTo(msg.angular.z);
+    if (timer <= 0){
+      setDriverTo(msg.linear.x);
+      setSterringTo(msg.angular.z);
     
-    digitalWrite(GREEN_LED_PIN, HIGH);
-    delay(20);
-    digitalWrite(GREEN_LED_PIN, LOW);
+      digitalWrite(GREEN_LED_PIN, HIGH);
+      delay(20);
+      digitalWrite(GREEN_LED_PIN, LOW);
+    }
 }
 /********************************************************************/
 
@@ -90,7 +100,12 @@ void setup() {
   
   digitalWrite(LED_PIN, HIGH);
   digitalWrite(GREEN_LED_PIN, HIGH);
-
+    
+  pinMode(CHANNEL_1, INPUT);
+  pinMode(CHANNEL_2, INPUT);
+  channel1_default = pulseIn(CHANNEL_1, HIGH, 75000);
+  channel2_default = pulseIn(CHANNEL_2, HIGH, 75000);
+  
   /******************************************************/  
   /* Setup motor drive and sterring
   /******************************************************/
@@ -144,6 +159,16 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
+    channel_1 = pulseIn(CHANNEL_1, HIGH, 75000); // Read the pulse width of 
+    channel_2 = pulseIn(CHANNEL_2, HIGH, 75000); // each channel    
+    if (abs(channel_1 - channel1_default) > 50 || abs(channel_2 - channel2_default) > 50){
+      timer = 100;  
+      drive_wheels.writeMicroseconds(channel_2);
+      sterring_wheels.writeMicroseconds(channel_1);
+    }
+    timer -= 1;
+    if (timer < 0) timer = 0;
+    
     wdt_reset();
     nh.spinOnce();
 
