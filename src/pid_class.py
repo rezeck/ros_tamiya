@@ -58,7 +58,7 @@ class PID:
 		en = self.rn - yn
 		
 		# Calculates filter time
-		Tf = ALPHA*self.Td
+		Tf = ALPHA * self.Td
 		if (Tf != 0.0) and (Ts != -Tf):
 			# Calculates derivate error
 			eDn = (GAMMA*self.rn) - yn
@@ -70,57 +70,59 @@ class PID:
 		# delta de atuacao Proporcional
 		delta_un = self.Kp*(ePn - self.ePn1)
 
-		# # TESTING ONLY PROPORTIONAL, UNCOMMENT THE OTHERS FOR INTEGRATIVE AND DERIVATIVE
-		# self.un = delta_un
-		# if self.un > self.umax:
-		# 	self.un = self.umax
-		# if self.un < self.umin:
-		# 	self.un = self.umin
-		# return self.un
-	
-		# termo integral
-		if (self.Ti != 0.0):
-			delta_un = delta_un + self.Kp*(Ts/self.Ti)*en
-		
-		# termo derivativo
-		if (Ts != 0.0):
-			delta_un = delta_un + self.Kp*(self.Td/Ts)*(eDfn - 2*self.eDfn1 + self.eDfn2)
-	
-		# incrementa saida
-		self.un = self.un + delta_un
-	
-		# integrator anti-windup logic
+		# TESTING ONLY PROPORTIONAL, UNCOMMENT THE OTHERS FOR INTEGRATIVE AND DERIVATIVE
+		self.un = delta_un
 		if self.un > self.umax:
 			self.un = self.umax
 		if self.un < self.umin:
 			self.un = self.umin
-		
-		# update indexed values
-		self.ePn1 = ePn
-		self.eDfn2 = self.eDfn1
-		self.eDfn1 = eDfn
-		
-		# novo tempo corrente
-		self.t = self.t + Ts
-	
-		# retorna a nova saida			
 		return self.un
+	
+		# # termo integral
+		# if (self.Ti != 0.0):
+		# 	delta_un = delta_un + self.Kp*(Ts/self.Ti)*en
+		
+		# # termo derivativo
+		# if (Ts != 0.0):
+		# 	delta_un = delta_un + self.Kp*(self.Td/Ts)*(eDfn - 2*self.eDfn1 + self.eDfn2)
+	
+		# # incrementa saida
+		# self.un = self.un + delta_un
+	
+		# # integrator anti-windup logic
+		# if self.un > self.umax:
+		# 	self.un = self.umax
+		# if self.un < self.umin:
+		# 	self.un = self.umin
+		
+		# # update indexed values
+		# self.ePn1 = ePn
+		# self.eDfn2 = self.eDfn1
+		# self.eDfn1 = eDfn
+		
+		# # novo tempo corrente
+		# self.t = self.t + Ts
+	
+		# # retorna a nova saida			
+		# return self.un
 
 if __name__ == "__main__":
 	
 	# Test linear
-	# KP_VEL = 5.0 
-	# TI_VEL = 80.0
-	# TD_VEL = 0*0.00005
+	KP_VEL = 30.0 
+	TI_VEL = 0#80.0
+	TD_VEL = 0#0*0.00005
 
-	# pid = PID(KP_VEL, TI_VEL, TD_VEL, -600, 600)
-	# pid.reference(0.0)
-	# print pid.u(0)
+	pid = PID(KP_VEL, TI_VEL, TD_VEL, 0, 100)
+	for i in [x * 0.1 for x in range(300, -1, -1)]:
+		pid.reference(0.0)
+		print 'dist:', i, 'vel:', pid.u(i)
+		time.sleep(0.05)
 
 	# Test angular
-	KP_PSI = 0.7
-	TI_PSI = 70.0
-	TD_PSI = 0*0.00007
-	pid = PID(KP_PSI, TI_PSI, TD_PSI, -95, 95)
-	pid.reference(0.0)
-	print pid.u(360)
+	# KP_PSI = 0.7
+	# TI_PSI = 70.0
+	# TD_PSI = 0*0.00007
+	# pid = PID(KP_PSI, TI_PSI, TD_PSI, -95, 95)
+	# pid.reference(0.0)
+	# print pid.u(360)

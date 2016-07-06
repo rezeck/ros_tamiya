@@ -19,9 +19,9 @@ class RobotCar:
         self.WAYPOINT_RADIUS = 5.0 # [m]
         
         # Gains linear vel
-        self.KP_VEL = 3.0 
-        self.TI_VEL = 80.0
-        self.TD_VEL = 0*0.00005
+        #self.KP_VEL = 300.0 
+        #self.TI_VEL = 80.0
+        #self.TD_VEL = 0*0.00005
 
         # Gains angular vel
         self.KP_PSI = 0.27
@@ -33,8 +33,9 @@ class RobotCar:
         # Lat, lon
         self.gps_target = [0, 0] 
                             # -19.869394, -43.964293 close to the entrance of icex
-                            # -19.869689, -43.964652 near 
-        self.gps_pos = [0.0, 0.0]
+                            # -19.869689, -43.964652 near
+                            # -19.869767, -43.964812 verlab location 
+        self.gps_pos = [0, 0]
         self.wpm = wp_manager.WPManager()
 
         self.orientation = 0.0
@@ -50,12 +51,14 @@ class RobotCar:
         self.out_lin = 0
 
         self.MAX_ANGLE = 95
+        
+        self.MIN_LINEAR = 50
         self.MAX_LINEAR = 300
 
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
-        self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -(self.MAX_LINEAR), self.MAX_LINEAR)
+        #self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -(self.MAX_LINEAR), self.MAX_LINEAR)
         
-        self.vel_publisher = rospy.Publisher('cmd_vel', Float32, queue_size=1, latch=True)
+        self.vel_publisher = rospy.Publisher('cmd_vel', Vector3, queue_size=1, latch=True)
         rospy.Subscriber("gps", Gps_msg, self.setGPS)
         #rospy.Subscriber("imu", Imu, self.setIMU)
         rospy.Subscriber("heading", Float32, self.setHeading)
@@ -107,7 +110,7 @@ class RobotCar:
         return self.pid_angle.u(alpha)
 
     def speedControl(self):
-        self.pid_vel.reference(0.0)
+        #self.pid_vel.reference(0.0)
         
         if self.wpm.isWayPointReached(self.gps_pos[0], self.gps_pos[1]) and not self.wpm.isCompleted():
             print 'WP Reached, getting next one...'
@@ -118,7 +121,23 @@ class RobotCar:
         else:            
             rho = self.wpm.getDistanceToTarget()
             print "GPS distance(m):", rho 
-            return self.pid_vel.u(rho)
+            #return self.pid_vel.u(rho)
+
+            if abs(self.out_ang) > 20:
+                return 200
+
+            control_dist = 10
+            if rho > control_dist:
+                return 50
+            else:
+                p = 100 - (rho * 100 / control_dist)
+                vel = ((p/100.0) * self.MAX_LINEAR - self.MIN_LINEAR) + self.MIN_LINEAR
+                if vel < self.MIN_LINEAR:
+                    vel = self.MIN_LINEAR
+                if vel > self.MAX_LINEAR:
+                    vel = self.MAX_LINEAR
+
+                return vel
 
     def calcBearingToTarget(self):
         """
@@ -158,12 +177,12 @@ class RobotCar:
 
     def control(self):
         print "Pos:", self.gps_pos
-	print "Target:", self.gps_target
-	self.gps_target[0], self.gps_target[1] = self.wpm.getCurrentWayPoint()
+        print "Target:", self.gps_target
+        self.gps_target[0], self.gps_target[1] = self.wpm.getCurrentWayPoint()
 
         bearing = self.calcBearingToTarget()
         print "Bearing to target:", bearing
-	print "Curr bearing:", self.psi        
+        print "Curr bearing:", self.psi        
 
         self.out_ang = degrees(self.angularControl(bearing))
         self.out_lin = self.speedControl()
@@ -189,15 +208,19 @@ def init_current_node():
     rospy.init_node('robotcar', anonymous=True)
 
     robot = RobotCar()
+    is_active = True
 
     while not rospy.is_shutdown():
-        if robot.isGPSFixed():
-            robot.control()
-            robot.publish()
-            
-        else:
+        if robot.isGPSFixed() and is_active:
+             robot.control()
+             robot.publish()
+        if not robot.isGPSFixed():
             print 'Gps not fixed yet...'
             print robot.getGpsData()
+        else:
+            var = raw_input("The robot is ready to go, are you sure?: y/n")
+            if var == 'y':
+                is_active = True
 
         print "\n\n"
         rospy.sleep(0.1)

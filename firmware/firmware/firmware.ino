@@ -57,23 +57,42 @@ int channel_2;
 int channel1_default;
 int channel2_default;
 int timer = 0;
+int controller_tresh_min = 300;
+int controller_tresh_max = 700;
+
+unsigned long prev_millis;
+byte MAX_CONTROL_DELAY = 2;
+boolean IS_STOP = false;
 /********************************************************************/
+
+static inline unsigned long elapsed() { return millis(); }
 
 /********************************************************************/
 /*  ROS Callbacks                                                   */
 /********************************************************************/
 //void callback(const geometry_msgs::Twist& msg){
-  void callback(const geometry_msgs::Vector3& msg){
-    if (timer <= 0){
+void callback(const geometry_msgs::Vector3& msg){
+    prev_millis = elapsed();
+    if(!IS_STOP){
       setDriverTo(msg.x);
       setSterringTo(msg.z);
-    
       digitalWrite(GREEN_LED_PIN, HIGH);
       delay(10);
       digitalWrite(GREEN_LED_PIN, LOW);
     }
 }
 /********************************************************************/
+
+float checkElapsedSeconds(){
+  unsigned long current_millis;
+  current_millis = elapsed();
+  return (current_millis - prev_millis) / 1000;
+}
+
+void stopVehicle(){
+  setDriverTo(300);
+  setSterringTo(0);
+}
 
 /********************************************************************/
 /*  ROS Setup                                                       */
@@ -110,6 +129,12 @@ void setup() {
   pinMode(CHANNEL_2, INPUT);
   channel1_default = pulseIn(CHANNEL_1, HIGH, 75000);
   channel2_default = pulseIn(CHANNEL_2, HIGH, 75000);
+  if(channel1_default < 1300 || channel2_default < 1300){
+    channel1_default = 0;
+    channel2_default = 0;
+    controller_tresh_min = 1300;
+    controller_tresh_max = 1700;
+  }
   
   /******************************************************/  
   /* Setup motor drive and sterring
@@ -118,7 +143,7 @@ void setup() {
   
   sterring_wheels.attach(STERRING_WHEELS_PIN);
   drive_wheels.attach(DRIVE_WHEELS_PIN);
-  drive_wheels.write(neutral); // Neutral
+  drive_wheels.writeMicroseconds(neutral); // Neutral
   sterring_wheels.write(95); // Neutral
   
   /******************************************************/
@@ -166,15 +191,24 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
-//    channel_1 = pulseIn(CHANNEL_1, HIGH, 75000); // Read the pulse width of 
-//    channel_2 = pulseIn(CHANNEL_2, HIGH, 75000); // each channel    
-//    if (abs(channel_1 - channel1_default) > 50 || abs(channel_2 - channel2_default) > 50){
-//      timer = 100;  
-//      drive_wheels.writeMicroseconds(channel_2);
-//      sterring_wheels.writeMicroseconds(channel_1);
-//    }
-//    timer -= 1;
-//    if (timer < 0) timer = 0;
+    wdt_reset();
+    
+    channel_1 = pulseIn(CHANNEL_1, HIGH, 75000); // Read the pulse width of 
+    channel_2 = pulseIn(CHANNEL_2, HIGH, 75000); // each channel
+    int a = abs(channel_1 - channel1_default);
+    int b = abs(channel_2 - channel2_default);
+    
+    if ((a > controller_tresh_min && a < controller_tresh_max) || (b > controller_tresh_min && b < controller_tresh_max)){
+      IS_STOP = true;
+      stopVehicle();
+    }
+    else{
+      IS_STOP = false;
+    }
+    
+    if(checkElapsedSeconds() >= MAX_CONTROL_DELAY){
+      stopVehicle();
+    }
     
     wdt_reset();
     nh.spinOnce();
@@ -298,9 +332,9 @@ void setDriverTo(int velocity){ // 1000:2000 (forward:backward)
   else if (velocity < 50) velocity = 50;
 
   int calcVel = abs(velocity + 300) + 1000;
-  if (calcVel == drive_wheels.read()) return;
+  if (calcVel == drive_wheels.readMicroseconds()) return;
   
-  drive_wheels.writeMicroseconds(velocity); // set velocity
+  drive_wheels.writeMicroseconds(calcVel); // set velocity
 }
 /********************************************************************/
 
