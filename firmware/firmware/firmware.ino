@@ -15,8 +15,10 @@
 #include <avr/wdt.h>
 
 #include <ros.h>
-#include <geometry_msgs/Twist.h>
+//#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Vector3.h>
 #include <ros_tamiya/Imu.h>
+#include <std_msgs/Float32.h>
 #include <ros_tamiya/Motor.h>
 /********************************************************************/
 
@@ -60,13 +62,14 @@ int timer = 0;
 /********************************************************************/
 /*  ROS Callbacks                                                   */
 /********************************************************************/
-void callback(const geometry_msgs::Twist& msg){
+//void callback(const geometry_msgs::Twist& msg){
+  void callback(const geometry_msgs::Vector3& msg){
     if (timer <= 0){
-      setDriverTo(msg.linear.x);
-      setSterringTo(msg.angular.z);
+      setDriverTo(msg.x);
+      setSterringTo(msg.z);
     
       digitalWrite(GREEN_LED_PIN, HIGH);
-      delay(20);
+      delay(10);
       digitalWrite(GREEN_LED_PIN, LOW);
     }
 }
@@ -76,10 +79,12 @@ void callback(const geometry_msgs::Twist& msg){
 /*  ROS Setup                                                       */
 /********************************************************************/
 ros::NodeHandle_<ArduinoHardware, 6, 6, 150, 150> nh; 
-ros::Subscriber<geometry_msgs::Twist> sub("cmd_vel", callback);
+ros::Subscriber<geometry_msgs::Vector3> sub("cmd_vel", callback);
 
 ros_tamiya::Imu imu_msg;
-ros::Publisher pub_imu("imu", &imu_msg);
+//ros::Publisher pub_imu("imu", &imu_msg);
+std_msgs::Float32 imu_heading;
+ros::Publisher pub_heading("heading", &imu_heading);
 
 //ros_tamiya::Motor motor_msg;
 //ros::Publisher pub_motor("motor_position", &motor_msg);
@@ -141,14 +146,16 @@ void setup() {
   /******************************************************/
   /* Setup ROS
   /******************************************************/
-  nh.getHardware()->setBaud(9600);
+  nh.getHardware()->setBaud(115200);
+//  nh.getHardware()->setBaud(9600);
   nh.initNode();
   nh.subscribe(sub);
   //nh.advertise(pub_motor);
-  nh.advertise(pub_imu);
+  //nh.advertise(pub_imu);
+  nh.advertise(pub_heading);
   /******************************************************/
   
-  delay(500);
+  delay(50);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(GREEN_LED_PIN, LOW);
   
@@ -159,15 +166,15 @@ void setup() {
 /* Arduino loop function                                            */
 /********************************************************************/
 void loop() {
-    channel_1 = pulseIn(CHANNEL_1, HIGH, 75000); // Read the pulse width of 
-    channel_2 = pulseIn(CHANNEL_2, HIGH, 75000); // each channel    
-    if (abs(channel_1 - channel1_default) > 50 || abs(channel_2 - channel2_default) > 50){
-      timer = 100;  
-      drive_wheels.writeMicroseconds(channel_2);
-      sterring_wheels.writeMicroseconds(channel_1);
-    }
-    timer -= 1;
-    if (timer < 0) timer = 0;
+//    channel_1 = pulseIn(CHANNEL_1, HIGH, 75000); // Read the pulse width of 
+//    channel_2 = pulseIn(CHANNEL_2, HIGH, 75000); // each channel    
+//    if (abs(channel_1 - channel1_default) > 50 || abs(channel_2 - channel2_default) > 50){
+//      timer = 100;  
+//      drive_wheels.writeMicroseconds(channel_2);
+//      sterring_wheels.writeMicroseconds(channel_1);
+//    }
+//    timer -= 1;
+//    if (timer < 0) timer = 0;
     
     wdt_reset();
     nh.spinOnce();
@@ -186,9 +193,10 @@ void loop() {
     //motor_msg.sterring_position = sterring_wheels.read();
     
     //pub_motor.publish(&motor_msg);
-    pub_imu.publish(&imu_msg);
+    pub_heading.publish(&imu_heading);
+    //pub_imu.publish(&imu_msg);
     digitalWrite(YELLOW_LED_PIN, HIGH);
-    delay(50);
+    delay(10);
     digitalWrite(YELLOW_LED_PIN, LOW);
 }
 /********************************************************************/
@@ -222,6 +230,7 @@ void getMagnetometerMsg(){
   compass_heading = 360 - compass_heading;
   
   imu_msg.heading = compass_heading;
+  imu_heading.data = compass_heading;
   imu_msg.magnetometer.x = fxm;
   imu_msg.magnetometer.y = fym;
   imu_msg.magnetometer.z = fzm;
@@ -286,12 +295,12 @@ void getAltitudeMsg(){
 /********************************************************************/
 void setDriverTo(int velocity){ // 1000:2000 (forward:backward)
   if(velocity > 300) velocity = 300;
-  else if (velocity < -300) velocity = -300;
+  else if (velocity < 50) velocity = 50;
 
   int calcVel = abs(velocity + 300) + 1000;
   if (calcVel == drive_wheels.read()) return;
   
-  drive_wheels.write(velocity); // set velocity
+  drive_wheels.writeMicroseconds(velocity); // set velocity
 }
 /********************************************************************/
 

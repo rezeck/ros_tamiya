@@ -7,7 +7,9 @@ import wp_manager
 
 from ros_tamiya.msg import Gps_msg
 from ros_tamiya.msg import Imu
+from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Vector3
 import time
 
 robot = None
@@ -53,9 +55,10 @@ class RobotCar:
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
         self.pid_vel   = pid_class.PID(self.KP_VEL, self.TI_VEL, self.TD_VEL, -(self.MAX_LINEAR), self.MAX_LINEAR)
         
-        self.vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=1, latch=True)
+        self.vel_publisher = rospy.Publisher('cmd_vel', Float32, queue_size=1, latch=True)
         rospy.Subscriber("gps", Gps_msg, self.setGPS)
-        rospy.Subscriber("imu", Imu, self.setIMU)
+        #rospy.Subscriber("imu", Imu, self.setIMU)
+        rospy.Subscriber("heading", Float32, self.setHeading)
         pass
 
     def isGPSFixed(self):
@@ -76,6 +79,9 @@ class RobotCar:
         self.speed = (0.514444 * data.speed) # from knots to meters/sec
         self.sat_num = data.sat_num
 
+    def setHeading(self, data):
+        self.psi = data.data
+
     def setIMU(self, data):
         #print 'setIMU data:', data.heading
         self.phi = data.gyroscope
@@ -83,7 +89,7 @@ class RobotCar:
         self.psi = data.heading
         
         self.psi = self.psi - self.MAGNETIC_DEFLECTION
-        if self.psi < 360:
+        if self.psi < 0:
 		self.psi += 360
 	#self.psi = self.psi % (2.0 * math.pi)
 
@@ -151,14 +157,14 @@ class RobotCar:
         return (c * r) * 1000
 
     def control(self):
-        print "Compass:", self.psi
         print "Pos:", self.gps_pos
-
+	print "Target:", self.gps_target
 	self.gps_target[0], self.gps_target[1] = self.wpm.getCurrentWayPoint()
 
         bearing = self.calcBearingToTarget()
         print "Bearing to target:", bearing
-        
+	print "Curr bearing:", self.psi        
+
         self.out_ang = degrees(self.angularControl(bearing))
         self.out_lin = self.speedControl()
         pass
@@ -169,10 +175,12 @@ class RobotCar:
         print "Angular:", self.out_ang, 'realCommand:', self.out_ang + 95
         
 
-        vel_msg = Twist()
-        vel_msg.angular.z = self.out_ang
-        vel_msg.linear.x = self.out_lin
-        
+        #vel_msg = Twist()
+        #vel_msg.angular.z = self.out_ang
+        #vel_msg.linear.x = self.out_lin
+        vel_msg = Vector3()        
+        vel_msg.z = self.out_ang
+        vel_msg.x = self.out_lin
         self.vel_publisher.publish(vel_msg)
 
         pass
