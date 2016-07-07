@@ -11,12 +11,15 @@ from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Vector3
 import time
+import os
 
 robot = None
 
 class RobotCar:
+
     def __init__(self):
-        self.WAYPOINT_RADIUS = 5.0 # [m]
+        self.curr_status = 'STANDBY'
+        self.WAYPOINT_RADIUS = 3.0 # [m]
         
         # Gains linear vel
         #self.KP_VEL = 300.0 
@@ -52,7 +55,7 @@ class RobotCar:
 
         self.MAX_ANGLE = 95
         
-        self.MIN_LINEAR = 0
+        self.MIN_LINEAR = -50
         self.MAX_LINEAR = 300
 
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
@@ -60,7 +63,6 @@ class RobotCar:
         
         self.vel_publisher = rospy.Publisher('cmd_vel', Vector3, queue_size=1, latch=True)
         rospy.Subscriber("gps", Gps_msg, self.setGPS)
-        #rospy.Subscriber("imu", Imu, self.setIMU)
         rospy.Subscriber("heading", Float32, self.setHeading)
         pass
 
@@ -114,13 +116,12 @@ class RobotCar:
         
         if self.wpm.isWayPointReached(self.gps_pos[0], self.gps_pos[1]) and not self.wpm.isCompleted():
             print 'WP Reached, getting next one...'
-	    return 300
+            return 300
         elif self.wpm.isCompleted():
             print 'WP completed, stopping...'
             return 300
         else:            
             rho = self.wpm.getDistanceToTarget()
-            print "GPS distance(m):", rho 
             #return self.pid_vel.u(rho)
 
             if abs(self.out_ang) > 30:
@@ -176,32 +177,30 @@ class RobotCar:
         return (c * r) * 1000
 
     def control(self):
-        print "Pos:", self.gps_pos
-        print "Target:", self.gps_target
         self.gps_target[0], self.gps_target[1] = self.wpm.getCurrentWayPoint()
 
-        bearing = self.calcBearingToTarget()
-        print "Bearing to target:", bearing
-        print "Curr bearing:", self.psi        
-
-        self.out_ang = degrees(self.angularControl(bearing))
+        self.out_ang = degrees(self.angularControl(self.calcBearingToTarget()))
         self.out_lin = self.speedControl()
         pass
 
     def publish(self):
-        print "Publishing!"
-        print "Linear:", self.out_lin, 'realCommand:', abs(self.out_lin + 300) + 1000
-        print "Angular:", self.out_ang, 'realCommand:', self.out_ang + 95
-        
-
-        #vel_msg = Twist()
-        #vel_msg.angular.z = self.out_ang
-        #vel_msg.linear.x = self.out_lin
         vel_msg = Vector3()        
         vel_msg.z = self.out_ang
         vel_msg.x = self.out_lin
         self.vel_publisher.publish(vel_msg)
+        pass
 
+    def printStatus(self):
+        os.system('clear')
+        print "Pos:", self.gps_pos
+        print "Target:", self.gps_target
+        print "GPS distance(m):", self.wpm.getDistanceToTarget()
+
+        print "Bearing to target:", self.calcBearingToTarget()
+        print "Curr bearing:", self.psi        
+
+        print "Linear:", self.out_lin, 'realCommand:', abs(self.out_lin + 300) + 1000
+        print "Angular:", self.out_ang, 'realCommand:', self.out_ang + 95
         pass
     
 def init_current_node():
@@ -214,14 +213,15 @@ def init_current_node():
         if robot.isGPSFixed() and is_active:
             robot.control()
             robot.publish()
+            robot.printStatus()
         elif not robot.isGPSFixed():
             print 'Gps not fixed yet...'
             print robot.getGpsData()
         else:
-            var = raw_input("The robot is ready to go, are you sure?: y/n")
-            is_active = True
+            var = raw_input("The robot is ready to go, are you sure?: y/n\n")
+            if var.strip() == 'y':
+                is_active = True
 
-        print "\n\n"
         rospy.sleep(0.1)
 
 if __name__ == '__main__':
