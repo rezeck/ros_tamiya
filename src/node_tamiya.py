@@ -52,7 +52,7 @@ class RobotCar:
 
         self.MAX_ANGLE = 95
         
-        self.MIN_LINEAR = 50
+        self.MIN_LINEAR = 0
         self.MAX_LINEAR = 300
 
         self.pid_angle = pid_class.PID(self.KP_PSI, self.TI_PSI, self.TD_PSI, -self.MAX_ANGLE, self.MAX_ANGLE)
@@ -123,15 +123,15 @@ class RobotCar:
             print "GPS distance(m):", rho 
             #return self.pid_vel.u(rho)
 
-            if abs(self.out_ang) > 20:
-                return 200
+            if abs(self.out_ang) > 30:
+                return 125
 
             control_dist = 10
             if rho > control_dist:
                 return 50
             else:
                 p = 100 - (rho * 100 / control_dist)
-                vel = ((p/100.0) * self.MAX_LINEAR - self.MIN_LINEAR) + self.MIN_LINEAR
+                vel = ((p/100.0) * self.MAX_LINEAR - self.MAX_LINEAR) + self.MIN_LINEAR
                 if vel < self.MIN_LINEAR:
                     vel = self.MIN_LINEAR
                 if vel > self.MAX_LINEAR:
@@ -208,19 +208,18 @@ def init_current_node():
     rospy.init_node('robotcar', anonymous=True)
 
     robot = RobotCar()
-    is_active = True
+    is_active = False
 
     while not rospy.is_shutdown():
         if robot.isGPSFixed() and is_active:
-             robot.control()
-             robot.publish()
-        if not robot.isGPSFixed():
+            robot.control()
+            robot.publish()
+        elif not robot.isGPSFixed():
             print 'Gps not fixed yet...'
             print robot.getGpsData()
         else:
             var = raw_input("The robot is ready to go, are you sure?: y/n")
-            if var == 'y':
-                is_active = True
+            is_active = True
 
         print "\n\n"
         rospy.sleep(0.1)
